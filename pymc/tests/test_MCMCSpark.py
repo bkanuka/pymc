@@ -2,7 +2,6 @@
 Test MCMC on Disaster Model on Spark
 '''
 from __future__ import with_statement
-from pyspark import SparkContext
 from pymc.MCMCSpark import MCMCSpark
 from pymc.examples import disaster_model
 from numpy.testing import *
@@ -10,11 +9,20 @@ import nose
 import warnings
 import numpy as np
 
+try:
+    from pyspark import SparkContext
+    running_in_spark = True
+except:
+    running_in_spark = False
 
 class test_MCMCSpark_withHDFS(TestCase):
 
     @classmethod
     def setUpClass(self):
+
+        if not running_in_spark:
+            raise nose.SkipTest
+
         self.M = MCMCSpark(input=disaster_model, nJobs=10)
 
     def test_sample(self):

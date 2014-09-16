@@ -241,12 +241,16 @@ class TestHDFS(TestPickle):
     @classmethod
     def setUpClass(self):
 
-        self.S = pymc.MCMC(disaster_model,
-                           db='hdfs',
-                           dbname=os.path.join(hdfsdir, 'Disaster.hdfs'),
-                           host=host,
-                           port=port,
-                           user_name=user_name)
+        try:
+            self.S = pymc.MCMC(disaster_model,
+                    db='hdfs',
+                    dbname=os.path.join(hdfsdir, 'Disaster.hdfs'),
+                    host=host,
+                    port=port,
+                    user_name=user_name)
+        except:
+            raise nose.SkipTest
+            
 
     def load(self):
         return pymc.database.hdfs.load(os.path.join(hdfsdir, 'Disaster.hdfs'),

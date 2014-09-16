@@ -11,3 +11,6 @@ testresults
 *.tmproj
 *.py.bak
 .DS_Store
+pymc/*.c
+debian/files
+debian/python-pymc*
