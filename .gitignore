@@ -14,3 +14,7 @@ testresults
 pymc/*.c
 debian/files
 debian/python-pymc*
+debian/debhelper.log
+debian/postinst.debhelper
+debian/prerm.debhelper
+debian/tmp*

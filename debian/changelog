@@ -1,0 +1,11 @@
+pymc (2.3.4+spark-ubuntu1) UNRELEASED; urgency=medium
+
+  * Debian from git 2.3.4 with pyspark
+
+ -- Bennett Kanuka <bkanuka@bennett-pc>  Tue, 16 Sep 2014 13:40:26 -0400
+
+pymc (2.2+ds-1) unstable; urgency=low
+
+  * Initial Debian release (Closes: #690800)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 30 Oct 2012 19:03:47 -0400

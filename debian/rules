@@ -1,0 +1,48 @@
+#!/usr/bin/make -f
+# -*- mode: makefile; coding: utf-8 -*-
+
+# override HOME (for weave) and matplotlib config directory
+# to allow building in chroots with read-only HOME
+export HOME=$(CURDIR)/build
+export MPLCONFIGDIR=$(HOME)
+
+include /usr/share/python/python.mk
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+	export OPT+=-O0
+	export FOPT+=-O0
+endif
+
+# one rule to rule them all ...
+%:
+# need to enforce distutils, since we also have a makefile
+	dh $@ --buildsystem=python_distutils --builddirectory=build
+
+override_dh_auto_build:
+	: # Cython pyx sources
+	for f in */*.pyx; do cython $$f; done
+
+	dh_auto_build
+	echo "backend : Agg" >| build/matplotlibrc
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	for v in $(shell pyversions -vr); do \
+		echo "I: Running PyMC unittests using python$$v"; \
+		 python$$v /usr/bin/nosetests -v -s --exclude='test_(interactive|gradients|LazyFunction|consistency|random|missing)' \
+		 	$(call py_builddir_sh, $$v)/pymc || exit 1 ;\
+	done
+endif
+
+override_dh_install:
+	dh_install
+	dh_numpy
+
+## immediately useable documentation
+## and exemplar data (they are small excerpts anyway)
+override_dh_compress:
+	dh_compress -X.py -X.html -X.css -X.jpg -X.txt -X.js -X.json -X.rtc -X.par -X.bin
+
+override_dh_auto_clean:
+	dh_auto_clean
+	for f in */*.pyx; do rm -f $${f%.pyx}.c; done

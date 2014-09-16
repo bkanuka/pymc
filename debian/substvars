@@ -1,0 +1,5 @@
+python:Versions=2.7
+python:Provides=python2.7-pymc
+python:Depends=python (<< 2.8), python (>= 2.7), python-numpy (>= 1:1.8.0), python-numpy-abi9, python-support (>= 0.90.0)
+shlibs:Depends=libblas3 | libblas.so.3, libc6 (>= 2.14), libgfortran3 (>= 4.6), liblapack3 | liblapack.so.3
+misc:Depends=
