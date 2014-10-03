@@ -40,7 +40,7 @@ class Trace():
             if x[0] == chain:
                 x[1][tname] = x[1][tname][:index]
             return x
-        new_rdd = self.db.rdd.map(truncate_helper).cache()
+        new_rdd = self.db.rdd.map(truncate_helper).persist(StorageLevel.MEMORY_AND_DISK)
         self.db.rdd = new_rdd
 
     def gettrace(self, burn=0, thin=1, chain=-1, slicing=None):
@@ -56,14 +56,14 @@ class Trace():
         chain : int
                 The index of the chain to fetch. If None, return all chains
         slicing : slice
-                A slice, overriding burn and thin assignments
+                A slice object, overriding burn and thin assignments
         """
         tname = self.name
         if slicing is None:
             slicing = slice(burn, None, thin)
         if chain is not None:
             if chain < 0:
-                chain = xrange(self.db.chains)[chain]
+                chain = chain % int(self.db.chains)
             return self.db.rdd.filter(
                     lambda x: x[0] == chain).map(
                             lambda x: x[1][tname][slicing]).first()
@@ -152,7 +152,7 @@ class Trace():
             if chain < 0:
                 chain = xrange(self.db.chains)[chain]
             filtered_rdd = self.db.rdd.filter(
-                lambda x: x[0] == chain).map(lambda x: x[1][tname]).cache()
+                lambda x: x[0] == chain).map(lambda x: x[1][tname])
             stat['mean'] = filtered_rdd.map(lambda x: x.mean(0)).first()
             stat['standard deviation'] = filtered_rdd.map(
                 lambda x: x.std(0)).first()
@@ -380,7 +380,7 @@ class Trace():
             tname = self.name
             rdd = self.db.rdd.filter(
                     lambda x: x[0] == chain).map(
-                            lambda x: x[1][tname]).cache()
+                            lambda x: x[1][tname])
 
         def batchsd_helper(trace):
             if batches > len(trace):
@@ -479,7 +479,7 @@ class Database():
                 for tname in trace_names:
                     x[1][tname] = x[1][tname][:index]
             return x
-        new_rdd = self.rdd.map(truncate_helper).cache()
+        new_rdd = self.rdd.map(truncate_helper).persist(StorageLevel.MEMORY_AND_DISK)
         self.rdd = new_rdd
 
 
@@ -496,7 +496,7 @@ def load_pickle(spark_context, dbname):
             Location of the Pickle object on HDFS
     """
     data_list = spark_context.pickleFile(name=dbname).collect()
-    rdd = spark_context.parallelize(data_list).cache()
+    rdd = spark_context.parallelize(data_list).persist(StorageLevel.MEMORY_AND_DISK)
     vars_to_tally = rdd.map(lambda x: x[1].keys()).first()
     vars_to_tally.remove('_state_')
     return Database(rdd, vars_to_tally)
@@ -563,4 +563,4 @@ def load_txt(spark_context, dbname):
             db[y[0]] = y[1]
             return db
     files = spark_context.wholeTextFiles(os.path.join(dbname, '*'))
-    return files.flatMap(load_mapper).reduceByKey(load_reducer).cache()
+    return files.flatMap(load_mapper).reduceByKey(load_reducer)

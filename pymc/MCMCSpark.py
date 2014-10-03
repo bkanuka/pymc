@@ -32,7 +32,7 @@ class MCMCSpark():
     """
 
     def __init__(self, input=None, db='spark', name='MCMC',
-                 calc_deviance=True, nJobs=1, **kwargs):
+                 calc_deviance=True, nChains=1, **kwargs):
         """
         Parameters
         ----------
@@ -41,7 +41,7 @@ class MCMCSpark():
         - db : str
                 The name of the database backend that will store the values
                 of the stochastics and deterministics sampled during the MCMC loop.
-        - nJobs : integer
+        - nChains : integer
                 Number of Spark jobs that will run MCMC
         - **kwarg : dict
                 - spark_context : SparkContext
@@ -49,8 +49,8 @@ class MCMCSpark():
                 - dbname : str
                         Optional, location to save the files on HDFS
         """
-        if nJobs < 1:
-            nJobs = 1
+        if nChains < 1:
+            nChains = 1
         self._check_database_backend(db)
         self.save_to_hdfs = False
         if db == 'hdfs':
@@ -67,7 +67,7 @@ class MCMCSpark():
         self.input = input
         # if self.model_file is None and self.input is None:
         # raise ValueError('Please provide a model')
-        self.nJobs = nJobs
+        self.nChains = nChains
         self.name = name
         self.calc_deviance = calc_deviance
         # self.sc.addPyFile(self.model_file)
@@ -89,7 +89,7 @@ class MCMCSpark():
         #model_file = self.model_file
         input_model = self.input
 
-        def sample_on_spark(nJob):
+        def sample_on_spark():
             # model_module = os.path.splitext(os.path.basename(model_file))[0]
             # imported_module = __import__(model_module)
             m = MCMC(input_model, db='ram', name=name,
@@ -99,19 +99,21 @@ class MCMCSpark():
                      save_interval, burn_till_tuned, stop_tuning_after,
                      verbose, progress_bar)
 
-            container = {}
-            for tname in m.db._traces:
-                container[tname] = m.db._traces[tname]._trace[0]
-            container['_state_'] = m.get_state()
-            return (nJob, container)
+            traces = {}
+            for t in m.db._traces:
+                traces[t] = sc.parallelize(m.db._traces[t]._trace[0]).persist(
+                        StorageLevel.MEMORY_AND_DISK)
+            traces['_state_'] = m.get_state()
+            del m
+            return traces
 
-        rdd = self.sc.parallelize(xrange(self.nJobs)).map(
-                sample_on_spark).cache()
+        chains = [sample_on_spark() for x in xrange(nChains)]
 
-        vars_to_tally = rdd.map(lambda x: x[1].keys()).first()
+        vars_to_tally = chains[0].keys()
         vars_to_tally.remove('_state_')
-        self._variables_to_tally = set(vars_to_tally)
-        self._assign_database_backend(rdd, vars_to_tally)
+        self._vars_to_tally = set(vars_to_tally)
+        self.db = spark.Database(rdd, self._vars_to_tally)
+
         if self.save_to_hdfs:
             self.save_as_txt_file(self.dbname)
 
@@ -129,12 +131,6 @@ class MCMCSpark():
         self.save_to_hdfs = False
         if db == 'hdfs':
             self.save_to_hdfs = True
-
-    def _assign_database_backend(self, db, vars_to_tally):
-        """
-        Assign Spark RDD database
-        """
-        self.db = spark.Database(db, vars_to_tally)
 
     def trace(self, name, chain=-1):
         """
@@ -391,7 +387,7 @@ class MCMCSpark():
         if chain is not None:
             if chain < 0:
                 chain = xrange(self.db.chains)[chain]
-            temp_rdd = self.db.rdd.filter(lambda x: x[0] == chain).cache()
+            temp_rdd = self.db.rdd.filter(lambda x: x[0] == chain)
         for v in self._variables_to_tally:
             def save_mapper(x):
                 data = '# Variable: %s\n' % v
